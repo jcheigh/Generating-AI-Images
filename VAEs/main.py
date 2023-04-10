@@ -1,14 +1,10 @@
-import tensorflow as tf
-
 import utils
 import model 
-import gpu
 
 # config hyperprameters
 epochs = 10
 batch_size = 32
 latent_dim = 2
-
 
 def main():
     # get data
@@ -26,4 +22,5 @@ def main():
     vae = model.VAE(latent_dim=latent_dim)
     model.train(model=vae, epochs=epochs, x=x_train, x_test=x_test)
 
-main()
+# main()
+model.check_gpu()

@@ -20,6 +20,23 @@ from keras.layers import InputLayer, Dense, Conv2D, Conv2DTranspose, Reshape, Fl
 '''Test and get GPU'''
 # test and get Colab gpu
 device_name = gpu.test_gpu()
+def check_gpu():
+    cpu_start = time.time()
+    with tf.device('/cpu:0'):
+        random_image_cpu = tf.random.normal((100, 100, 100, 3))
+        net_cpu = tf.keras.layers.Conv2D(32, 7)(random_image_cpu)
+        tf.math.reduce_sum(net_cpu)
+    cpu_end = time.time()
+
+    gpu_start = time.time()
+    with tf.device(device_name):
+        random_image_gpu = tf.random.normal((100, 100, 100, 3))
+        net_gpu = tf.keras.layers.Conv2D(32, 7)(random_image_gpu)
+        tf.math.reduce_sum(net_gpu)
+    gpu_end = time.time()
+
+    print(f'CPU: {cpu_end-cpu_start}')
+    print(f'GPU: {gpu_end-gpu_start}')
 
 '''Basic Convolutional VAE'''
 class VAE(Model):
@@ -108,7 +125,7 @@ def train_per_batch(model, x):
             optimizer.apply_gradients(zip(gradient, model.trainable_variables))
         return loss
 
-def train(model, device_name, epochs, x, x_test=None):
+def train(model, epochs, x, x_test=None):
     # for each epoch
     with tf.device(device_name=device_name):
         for epoch in range(epochs):
