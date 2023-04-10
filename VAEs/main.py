@@ -11,9 +11,6 @@ latent_dim = 2
 
 
 def main():
-    # test and get Colab gpu
-    device_name = gpu.test_gpu()
-
     # get data
     x_train, x_test = utils.load_data()
 
@@ -27,6 +24,6 @@ def main():
 
     # define and train model
     vae = model.VAE(latent_dim=latent_dim)
-    model.train(model=vae, device_name=device_name, epochs=epochs, x=x_train, x_test=x_test)
+    model.train(model=vae, epochs=epochs, x=x_train, x_test=x_test)
 
 main()
