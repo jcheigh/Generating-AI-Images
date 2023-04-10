@@ -95,23 +95,24 @@ def train_per_batch(model, x):
         optimizer.apply_gradients(zip(gradient, model.trainable_variables))
     return loss
 
-def train(model, epochs, x, x_test=None):
+def train(model, device_name, epochs, x, x_test=None):
     # for each epoch
-    for epoch in range(epochs):
-        start_time = time.time()
-        train_loss = metrics.Mean()
-        for x_batch in x:
-            train_loss(train_per_batch(model, x_batch))
-        time_elapsed = time.time() - start_time
-        loss = train_loss.result()
-        print(f'Epoch: {epoch}, train loss: {loss}, time elapsed: {time_elapsed}')
+    with tf.device(device_name=device_name):
+        for epoch in range(epochs):
+            start_time = time.time()
+            train_loss = metrics.Mean()
+            for x_batch in x:
+                train_loss(train_per_batch(model, x_batch))
+            time_elapsed = time.time() - start_time
+            loss = train_loss.result()
+            print(f'Epoch: {epoch}, train loss: {loss}, time elapsed: {time_elapsed}')
 
-        if x_test is not None:
-            for test_batch in x_test:
-                x_sample = test_batch[0:16,:,:,:]
-                break
-            pred = predict(model=model, x=x_sample)
-            show_pred(pred, epoch)
+            if x_test is not None:
+                for test_batch in x_test:
+                    x_sample = test_batch[0:16,:,:,:]
+                    break
+                pred = predict(model=model, x=x_sample)
+                show_pred(pred, epoch)
 
 def predict(model, x):
     mean, logvar = model.encode(x) 

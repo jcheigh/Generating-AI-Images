@@ -26,8 +26,7 @@ def main():
     x_test = utils.split_batch(image_data=x_test, batch_size=batch_size)
 
     # define and train model
-    with tf.device(device_name=device_name):
-        vae = model.VAE(latent_dim=latent_dim)
-        model.train(model=vae, epochs=epochs, x=x_train, x_test=x_test)
+    vae = model.VAE(latent_dim=latent_dim)
+    model.train(model=vae, device_name=device_name, epochs=epochs, x=x_train, x_test=x_test)
 
 main()
