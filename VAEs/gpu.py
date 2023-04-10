@@ -10,10 +10,10 @@ def check_gpu():
     import timeit, functools
     print('CPU (s):')
     cpu_time = timeit.Timer(functools.partial(run_cpu, cpu_device))
-    print(cpu_time.timeit(10))
+    print(cpu_time.timeit(50))
     print('GPU (s):')
     gpu_time = timeit.Timer(functools.partial(run_gpu, gpu_device))
-    print(gpu_time.timeit(10))
+    print(gpu_time.timeit(50))
     
 x_train, _ = utils.load_data()
 x_train = utils.preprocess_image_data(x_train)
