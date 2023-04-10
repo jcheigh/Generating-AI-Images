@@ -151,7 +151,7 @@ def check_gpu():
     print('GPU (s):')
     gpu_time = timeit.Timer(functools.partial(run_gpu))
     print(gpu_time.timeit(10))
-    print('GPU speedup over CPU: {}x'.format(int(cpu_time/gpu_time)))
+    print('GPU speedup over CPU: {}x'.format(int(cpu_time)/int(gpu_time)))
 
 def run_cpu():
     with tf.device('/cpu:0'):
