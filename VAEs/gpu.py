@@ -23,10 +23,10 @@ net = model.VAE(latent_dim=2)
 
 def run_cpu(cpu_device):
     with tf.device(cpu_device):
-        model.train(net, x_train, cpu_device)
+        model.train(net, cpu_device, 10, x_train)
 
 def run_gpu(gpu_device):
     with tf.device(gpu_device):
-        model.train(net, x_train, gpu_device)
+        model.train(net, gpu_device, 10, x_train)
 
 check_gpu()
