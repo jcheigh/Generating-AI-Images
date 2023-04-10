@@ -9,11 +9,11 @@ cpu_device = '/cpu:0'
 def check_gpu():
     import timeit, functools
     print('CPU (s):')
-    cpu_time = timeit.Timer(functools.partial(run_cpu, cpu_device))
-    print(cpu_time.timeit(100))
+    cpu_time = timeit.Timer(functools.partial(run_cpu, '/cpu:0'))
+    print(cpu_time.timeit(200))
     print('GPU (s):')
-    gpu_time = timeit.Timer(functools.partial(run_gpu, gpu_device))
-    print(gpu_time.timeit(100))
+    gpu_time = timeit.Timer(functools.partial(run_gpu, tf.test.gpu_device_name()))
+    print(gpu_time.timeit(200))
     
 x_train, _ = utils.load_data()
 x_train = utils.preprocess_image_data(x_train)
