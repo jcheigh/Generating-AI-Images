@@ -21,6 +21,16 @@ from keras.layers import InputLayer, Dense, Conv2D, Conv2DTranspose, Reshape, Fl
 # test and get Colab gpu
 device_name = gpu.test_gpu()
 def check_gpu():
+    import timeit
+    print('CPU (s):')
+    cpu_time = timeit.timeit('run_cpu()', number=10, setup="from __main__ import cpu")
+    print(cpu_time)
+    print('GPU (s):')
+    gpu_time = timeit.timeit('run_gpu()', number=10, setup="from __main__ import gpu")
+    print(gpu_time)
+    print('GPU speedup over CPU: {}x'.format(int(cpu_time/gpu_time)))
+
+def run_cpu():
     cpu_start = time.time()
     with tf.device('/cpu:0'):
         random_image_cpu = tf.random.normal((100, 100, 100, 3))
@@ -28,6 +38,7 @@ def check_gpu():
         tf.math.reduce_sum(net_cpu)
     cpu_end = time.time()
 
+def run_gpu():
     gpu_start = time.time()
     with tf.device(device_name):
         random_image_gpu = tf.random.normal((100, 100, 100, 3))
