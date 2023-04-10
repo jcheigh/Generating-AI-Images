@@ -29,4 +29,4 @@ def run_gpu(gpu_device):
     with tf.device(gpu_device):
         model.train(net, gpu_device, 10, x_train)
 
-run_gpu()
+run_gpu(gpu_device)
