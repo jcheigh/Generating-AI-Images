@@ -10,10 +10,10 @@ def check_gpu():
     import timeit, functools
     print('CPU (s):')
     cpu_time = timeit.Timer(functools.partial(run_cpu, '/cpu:0'))
-    print(cpu_time.timeit(200))
+    print(cpu_time.timeit(1000))
     print('GPU (s):')
     gpu_time = timeit.Timer(functools.partial(run_gpu, tf.test.gpu_device_name()))
-    print(gpu_time.timeit(200))
+    print(gpu_time.timeit(1000))
     
 x_train, _ = utils.load_data()
 x_train = utils.preprocess_image_data(x_train)
@@ -23,14 +23,10 @@ net = model.VAE(latent_dim=2)
 
 def run_cpu(cpu_device):
     with tf.device(cpu_device):
-        for x_batch in x_train:
-            model.train_per_batch(net, x_batch, cpu_device)
-            break
+        model.train_per_batch(net, x_train, cpu_device)
 
 def run_gpu(gpu_device):
     with tf.device(gpu_device):
-        for x_batch in x_train:
-            model.train_per_batch(net, x_batch, gpu_device)
-            break
+        model.train_per_batch(net, x_train, gpu_device)
 
 check_gpu()
