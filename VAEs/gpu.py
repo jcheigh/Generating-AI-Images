@@ -42,3 +42,5 @@ def run_gpu(gpu_device):
     with tf.device(gpu_device):
         for x_batch in x_train:
             model.train_per_batch(net, x_batch, gpu_device)
+
+check_gpu()
