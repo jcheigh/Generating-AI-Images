@@ -23,10 +23,10 @@ device_name = gpu.test_gpu()
 def check_gpu():
     import timeit
     print('CPU (s):')
-    cpu_time = timeit.timeit('run_cpu()', number=10, setup="from __main__ import run_cpu")
+    cpu_time = timeit.timeit('run_cpu()', number=10)
     print(cpu_time)
     print('GPU (s):')
-    gpu_time = timeit.timeit('run_gpu()', number=10, setup="from __main__ import run_gpu")
+    gpu_time = timeit.timeit('run_gpu()', number=10)
     print(gpu_time)
     print('GPU speedup over CPU: {}x'.format(int(cpu_time/gpu_time)))
 
