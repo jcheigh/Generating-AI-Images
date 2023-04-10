@@ -17,34 +17,7 @@ from tensorflow import keras, random, nn
 from keras import Model, Sequential, optimizers, metrics
 from keras.layers import InputLayer, Dense, Conv2D, Conv2DTranspose, Reshape, Flatten
 
-'''Test and get GPU'''
-# test and get Colab gpu
 device_name = gpu.test_gpu()
-def check_gpu():
-    import timeit
-    print('CPU (s):')
-    cpu_time = timeit.timeit('run_cpu()', number=100, setup="from model import run_cpu")
-    print(cpu_time)
-    print('GPU (s):')
-    gpu_time = timeit.timeit('run_gpu()', number=100, setup="from model import run_gpu")
-    print(gpu_time)
-    print('GPU speedup over CPU: {}x'.format(int(cpu_time/gpu_time)))
-
-def run_cpu():
-    cpu_start = time.time()
-    with tf.device('/cpu:0'):
-        random_image_cpu = tf.random.normal((100, 100, 100, 3))
-        net_cpu = tf.keras.layers.Conv2D(32, 7)(random_image_cpu)
-        tf.math.reduce_sum(net_cpu)
-    cpu_end = time.time()
-
-def run_gpu():
-    gpu_start = time.time()
-    with tf.device(device_name):
-        random_image_gpu = tf.random.normal((100, 100, 100, 3))
-        net_gpu = tf.keras.layers.Conv2D(32, 7)(random_image_gpu)
-        tf.math.reduce_sum(net_gpu)
-    gpu_end = time.time()
 
 '''Basic Convolutional VAE'''
 class VAE(Model):
@@ -168,3 +141,26 @@ def show_pred(pred, epoch=None):
         plt.savefig(f'./digits_images/epoch{epoch}.png')
     else:
         plt.show()
+
+'''Test and get GPU'''
+def check_gpu():
+    import timeit
+    print('CPU (s):')
+    cpu_time = timeit.Timer(run_cpu())
+    print(cpu_time.timeit(10))
+    print('GPU (s):')
+    gpu_time = timeit.Timer(run_gpu())
+    print(gpu_time.timeit(10))
+    print('GPU speedup over CPU: {}x'.format(int(cpu_time/gpu_time)))
+
+def run_cpu():
+    with tf.device('/cpu:0'):
+        random_image_gpu = tf.random.normal((100, 100, 100, 3))
+        net_gpu = tf.keras.layers.Conv2D(32, 7)(random_image_gpu)
+        tf.math.reduce_sum(net_gpu)
+
+def run_gpu():
+    with tf.device(device_name):
+        random_image_gpu = tf.random.normal((100, 100, 100, 3))
+        net_gpu = tf.keras.layers.Conv2D(32, 7)(random_image_gpu)
+        tf.math.reduce_sum(net_gpu)
