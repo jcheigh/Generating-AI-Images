@@ -144,12 +144,12 @@ def show_pred(pred, epoch=None):
 
 '''Test and get GPU'''
 def check_gpu():
-    import timeit
+    import timeit, functools
     print('CPU (s):')
-    cpu_time = timeit.Timer(run_cpu())
+    cpu_time = timeit.Timer(functools.partial(run_cpu))
     print(cpu_time.timeit(10))
     print('GPU (s):')
-    gpu_time = timeit.Timer(run_gpu())
+    gpu_time = timeit.Timer(functools.partial(run_gpu))
     print(gpu_time.timeit(10))
     print('GPU speedup over CPU: {}x'.format(int(cpu_time/gpu_time)))
 
