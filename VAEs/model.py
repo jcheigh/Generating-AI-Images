@@ -46,9 +46,6 @@ def run_gpu():
         tf.math.reduce_sum(net_gpu)
     gpu_end = time.time()
 
-    print(f'CPU: {cpu_end-cpu_start}')
-    print(f'GPU: {gpu_end-gpu_start}')
-
 '''Basic Convolutional VAE'''
 class VAE(Model):
 
