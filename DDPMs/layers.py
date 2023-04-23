@@ -11,6 +11,11 @@ from keras import Sequential
 from keras.layers import Layer, Dense, Conv2D, Softmax
 import tensorflow_addons as tfa
 
+gpu_device = tf.test.gpu_device_name()
+cpu_device = '/cpu:0'
+# set CPU the device for now
+device = gpu_device
+
 '''
     Sinusoidal positional embedding layer: this layer generates a embeddings using sin and cos functions and
     allows our model to learn the relative positions of input sequential data. In our specific case, we use 
@@ -23,13 +28,14 @@ class SinusoidalPosEmb(Layer):
         self.max_positions = max_positions
 
     def call(self, x, training=True):
-        x = tf.cast(x, tf.float32)
-        half_dim = self.dim // 2
-        emb = math.log(self.max_positions) / (half_dim - 1)
-        emb = tf.exp(tf.range(half_dim, dtype=tf.float32) * -emb)
-        emb = x[:, None] * emb[None, :]
-        emb = tf.concat([tf.sin(emb), tf.cos(emb)], axis=-1)
-        return emb
+        with tf.device(device):
+            x = tf.cast(x, tf.float32)
+            half_dim = self.dim // 2
+            emb = math.log(self.max_positions) / (half_dim - 1)
+            emb = tf.exp(tf.range(half_dim, dtype=tf.float32) * -emb)
+            emb = x[:, None] * emb[None, :]
+            emb = tf.concat([tf.sin(emb), tf.cos(emb)], axis=-1)
+            return emb
 
 '''
     Identity layer: this layer returns the tensor of the same shape and content as the input
@@ -39,7 +45,8 @@ class Identity(Layer):
         super(Identity, self).__init__()
 
     def call(self, x, training=True):
-        return tf.identity(x)
+        with tf.device(device):
+            return tf.identity(x)
 
 
 '''
@@ -52,7 +59,8 @@ class Residual(Layer):
         self.fn = fn
 
     def call(self, x, training=True):
-        return self.fn(x, training=training) + x
+        with tf.device(device):
+            return self.fn(x, training=training) + x
 
 '''
     Normalization layer: this layer normalizes the input with respect to the mean and variance
@@ -65,10 +73,11 @@ class LayerNorm(Layer):
         self.b = tf.Variable(tf.zeros([1, 1, 1, dim]))
 
     def call(self, x, training=True):
-        var = tf.math.reduce_variance(x, axis=-1, keepdims=True)
-        mean = tf.reduce_mean(x, axis=-1, keepdims=True)
-        x = (x - mean) / tf.sqrt((var + self.eps)) * self.g + self.b
-        return x
+        with tf.device(device):
+            var = tf.math.reduce_variance(x, axis=-1, keepdims=True)
+            mean = tf.reduce_mean(x, axis=-1, keepdims=True)
+            x = (x - mean) / tf.sqrt((var + self.eps)) * self.g + self.b
+            return x
 
 '''
     Pre-Normalization layer: this layer calls the normalization layer of a certain dimension
@@ -81,22 +90,25 @@ class PreNorm(Layer):
         self.norm = LayerNorm(dim)
 
     def call(self, x, training=True):
-        x = self.norm(x)
-        return self.fn(x)
+        with tf.device(device):
+            x = self.norm(x)
+            return self.fn(x)
 
 '''
     Sigmoid Linear Unit (SiLU) layer: this layer defines the sigmoid linear function given by
     silu(x) = x * sigmoid(x). It is useful due to its self-stabilizing property.
 '''
 def silu(x):
-    return x * tf.nn.sigmoid(x)
+    with tf.device(device):
+        return x * tf.nn.sigmoid(x)
 
 class SiLU(Layer):
     def __init__(self):
         super(SiLU, self).__init__()
 
     def call(self, x, training=True):
-        return silu(x)
+        with tf.device(device):
+            return silu(x)
 
 '''
     Gaussian Error Linear Unit layer: this layer defines Gaussian error linear function given by
@@ -104,11 +116,12 @@ class SiLU(Layer):
     useful in bridging stochatic regularizers with non-liniearities.
 '''
 def gelu(x, approximate=False):
-    if approximate:
-        coeff = tf.cast(0.044715, x.dtype)
-        return 0.5 * x * (1.0 + tf.tanh(0.7978845608028654 * (x + coeff * tf.pow(x, 3))))
-    else:
-        return 0.5 * x * (1.0 + tf.math.erf(x / tf.cast(1.4142135623730951, x.dtype)))
+    with tf.device(device):
+        if approximate:
+            coeff = tf.cast(0.044715, x.dtype)
+            return 0.5 * x * (1.0 + tf.tanh(0.7978845608028654 * (x + coeff * tf.pow(x, 3))))
+        else:
+            return 0.5 * x * (1.0 + tf.math.erf(x / tf.cast(1.4142135623730951, x.dtype)))
 
 class GELU(Layer):
     def __init__(self, approximate=False):
@@ -116,7 +129,8 @@ class GELU(Layer):
         self.approximate = approximate
 
     def call(self, x, training=True):
-        return gelu(x, self.approximate)
+        with tf.device(device):
+            return gelu(x, self.approximate)
 
 '''
     Block layer: this layer defines a unit block in the following Residual networ layer
@@ -130,15 +144,16 @@ class Block(Layer):
 
 
     def call(self, x, gamma_beta=None, training=True):
-        x = self.proj(x)
-        x = self.norm(x, training=training)
+        with tf.device(device):
+            x = self.proj(x)
+            x = self.norm(x, training=training)
 
-        if gamma_beta is not None:
-            gamma, beta = gamma_beta
-            x = x * (gamma + 1) + beta
+            if gamma_beta is not None:
+                gamma, beta = gamma_beta
+                x = x * (gamma + 1) + beta
 
-        x = self.act(x)
-        return x
+            x = self.act(x)
+            return x
 
 '''
     Residual Network layer: this layer defines the layer of our residual network. This allows us to 
@@ -160,16 +175,17 @@ class ResnetBlock(Layer):
         self.res_conv = Conv2D(filters=dim_out, kernel_size=1, strides=1) if dim != dim_out else Identity()
 
     def call(self, x, time_emb=None, training=True):
-        gamma_beta = None
-        if self.mlp is not None and time_emb is not None:
-            time_emb = self.mlp(time_emb)
-            time_emb = rearrange(time_emb, 'b c -> b 1 1 c')
-            gamma_beta = tf.split(time_emb, num_or_size_splits=2, axis=-1)
+        with tf.device(device):
+            gamma_beta = None
+            if self.mlp is not None and time_emb is not None:
+                time_emb = self.mlp(time_emb)
+                time_emb = rearrange(time_emb, 'b c -> b 1 1 c')
+                gamma_beta = tf.split(time_emb, num_or_size_splits=2, axis=-1)
 
-        h = self.block1(x, gamma_beta=gamma_beta, training=training)
-        h = self.block2(h, training=training)
+            h = self.block1(x, gamma_beta=gamma_beta, training=training)
+            h = self.block2(h, training=training)
 
-        return h + self.res_conv(x)
+            return h + self.res_conv(x)
 
 '''
     Linear Attention layer: this layer defines alinear attension layer. Unlike attension layer, 
@@ -192,21 +208,22 @@ class LinearAttention(Layer):
         ])
 
     def call(self, x, training=True):
-        b, h, w, c = x.shape
-        qkv = self.to_qkv(x)
-        qkv = tf.split(qkv, num_or_size_splits=3, axis=-1)
-        q, k, v = map(lambda t: rearrange(t, 'b x y (h c) -> b h c (x y)', h=self.heads), qkv)
+        with tf.device(device):
+            b, h, w, c = x.shape
+            qkv = self.to_qkv(x)
+            qkv = tf.split(qkv, num_or_size_splits=3, axis=-1)
+            q, k, v = map(lambda t: rearrange(t, 'b x y (h c) -> b h c (x y)', h=self.heads), qkv)
 
-        q = tf.nn.softmax(q, axis=-2)
-        k = tf.nn.softmax(k, axis=-1)
+            q = tf.nn.softmax(q, axis=-2)
+            k = tf.nn.softmax(k, axis=-1)
 
-        q = q * self.scale
-        context = einsum('b h d n, b h e n -> b h d e', k, v)
+            q = q * self.scale
+            context = einsum('b h d n, b h e n -> b h d e', k, v)
 
-        out = einsum('b h d e, b h d n -> b h e n', context, q)
-        out = rearrange(out, 'b h c (x y) -> b x y (h c)', h=self.heads, x=h, y=w)
-        out = self.to_out(out, training=training)
-        return out
+            out = einsum('b h d e, b h d n -> b h e n', context, q)
+            out = rearrange(out, 'b h c (x y) -> b x y (h c)', h=self.heads, x=h, y=w)
+            out = self.to_out(out, training=training)
+            return out
 
 '''
     Attension layer: this layer defines regular attension later. This performs a weighted mean reduction
@@ -219,23 +236,26 @@ class Attention(Layer):
         self.scale = dim_head ** -0.5
         self.heads = heads
         self.hidden_dim = dim_head * heads
+
         self.to_qkv = Conv2D(filters=self.hidden_dim * 3, kernel_size=1, strides=1, use_bias=False)
         self.to_out = Conv2D(filters=dim, kernel_size=1, strides=1)
 
     def call(self, x, training=True):
-        b, h, w, c = x.shape
-        qkv = self.to_qkv(x)
-        qkv = tf.split(qkv, num_or_size_splits=3, axis=-1)
-        q, k, v = map(lambda t: rearrange(t, 'b x y (h c) -> b h c (x y)', h=self.heads), qkv)
-        q = q * self.scale
+        with tf.device(device):
+            b, h, w, c = x.shape
+            qkv = self.to_qkv(x)
+            qkv = tf.split(qkv, num_or_size_splits=3, axis=-1)
+            q, k, v = map(lambda t: rearrange(t, 'b x y (h c) -> b h c (x y)', h=self.heads), qkv)
+            q = q * self.scale
 
-        sim = einsum('b h d i, b h d j -> b h i j', q, k)
-        sim_max = tf.stop_gradient(tf.expand_dims(tf.argmax(sim, axis=-1), axis=-1))
-        sim_max = tf.cast(sim_max, tf.float32)
-        sim = sim - sim_max
-        attn = tf.nn.softmax(sim, axis=-1)
+            sim = einsum('b h d i, b h d j -> b h i j', q, k)
+            sim_max = tf.stop_gradient(tf.expand_dims(tf.argmax(sim, axis=-1), axis=-1))
+            sim_max = tf.cast(sim_max, tf.float32)
+            sim = sim - sim_max
+            attn = tf.nn.softmax(sim, axis=-1)
 
-        out = einsum('b h i j, b h d j -> b h i d', attn, v)
-        out = rearrange(out, 'b h (x y) d -> b x y (h d)', x = h, y = w)
-        out = self.to_out(out, training=training)
-        return out
+            out = einsum('b h i j, b h d j -> b h i d', attn, v)
+            out = rearrange(out, 'b h (x y) d -> b x y (h d)', x = h, y = w)
+            out = self.to_out(out, training=training)
+
+            return out
