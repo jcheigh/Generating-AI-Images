@@ -10,7 +10,7 @@ from inspect import isfunction
 gpu_device = tf.test.gpu_device_name()
 cpu_device = '/cpu:0'
 # set CPU the device for now
-device = gpu_device
+device = cpu_device
 
 class Unet(Model):
     def __init__(self, dim=64, init_dim=None, out_dim=None, dim_mults=(1,2,4,8), channels=1, resnet_block_groups=8, learned_variance=False, sinusoidal_cond_mlp=True):
