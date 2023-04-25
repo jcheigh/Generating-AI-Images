@@ -17,27 +17,6 @@ cpu_device = '/cpu:0'
 device = gpu_device
 
 '''
-    Sinusoidal positional embedding layer: this layer generates a embeddings using sin and cos functions and
-    allows our model to learn the relative positions of input sequential data. In our specific case, we use 
-    this layer to transfer time steps to time ecodings in time embedding space
-'''
-class SinusoidalPosEmb(Layer):
-    def __init__(self, dim, max_positions=10000):
-        super(SinusoidalPosEmb, self).__init__()
-        self.dim = dim
-        self.max_positions = max_positions
-
-    def call(self, x, training=True):
-        with tf.device(device):
-            x = tf.cast(x, tf.float32)
-            half_dim = self.dim // 2
-            emb = math.log(self.max_positions) / (half_dim - 1)
-            emb = tf.exp(tf.range(half_dim, dtype=tf.float32) * -emb)
-            emb = x[:, None] * emb[None, :]
-            emb = tf.concat([tf.sin(emb), tf.cos(emb)], axis=-1)
-            return emb
-
-'''
     Identity layer: this layer returns the tensor of the same shape and content as the input
 '''
 class Identity(Layer):
@@ -48,26 +27,12 @@ class Identity(Layer):
         with tf.device(device):
             return tf.identity(x)
 
-
-'''
-    Residual Layer: this layer takes in some function and apply the function on an input. In our case,
-    it will be used for incorporating attention.
-'''
-class Residual(Layer):
-    def __init__(self, fn):
-        super(Residual, self).__init__()
-        self.fn = fn
-
-    def call(self, x, training=True):
-        with tf.device(device):
-            return self.fn(x, training=training) + x
-
 '''
     Normalization layer: this layer normalizes the input with respect to the mean and variance
 '''
-class LayerNorm(Layer):
+class Norm(Layer):
     def __init__(self, dim, eps=1e-5, **kwargs):
-        super(LayerNorm, self).__init__(**kwargs)
+        super(Norm, self).__init__(**kwargs)
         self.eps = eps
         self.g = tf.Variable(tf.ones([1, 1, 1, dim]))
         self.b = tf.Variable(tf.zeros([1, 1, 1, dim]))
@@ -87,7 +52,7 @@ class PreNorm(Layer):
     def __init__(self, dim, fn):
         super(PreNorm, self).__init__()
         self.fn = fn
-        self.norm = LayerNorm(dim)
+        self.norm = Norm(dim)
 
     def call(self, x, training=True):
         with tf.device(device):
@@ -133,14 +98,14 @@ class GELU(Layer):
             return gelu(x, self.approximate)
 
 '''
-    Block layer: this layer defines a unit block in the following Residual networ layer
+    Unit Block layer: this layer defines a unit block in the following Residual networ layer
 '''
-class Block(Layer):
+class UnitBlock(Layer):
     def __init__(self, dim, groups=8):
-        super(Block, self).__init__()
+        super(UnitBlock, self).__init__()
         self.proj = Conv2D(dim, kernel_size=3, strides=1, padding='SAME')
         self.norm = tfa.layers.GroupNormalization(groups, epsilon=1e-05)
-        self.act = SiLU()
+        self.silu = SiLU()
 
 
     def call(self, x, gamma_beta=None, training=True):
@@ -152,7 +117,7 @@ class Block(Layer):
                 gamma, beta = gamma_beta
                 x = x * (gamma + 1) + beta
 
-            x = self.act(x)
+            x = self.silu(x)
             return x
 
 '''
@@ -170,8 +135,8 @@ class ResnetBlock(Layer):
             Dense(units=dim_out * 2)
         ]) if time_emb_dim is not None else None
 
-        self.block1 = Block(dim_out, groups=groups)
-        self.block2 = Block(dim_out, groups=groups)
+        self.block1 = UnitBlock(dim_out, groups=groups)
+        self.block2 = UnitBlock(dim_out, groups=groups)
         self.res_conv = Conv2D(filters=dim_out, kernel_size=1, strides=1) if dim != dim_out else Identity()
 
     def call(self, x, time_emb=None, training=True):
@@ -181,11 +146,43 @@ class ResnetBlock(Layer):
                 time_emb = self.mlp(time_emb)
                 time_emb = rearrange(time_emb, 'b c -> b 1 1 c')
                 gamma_beta = tf.split(time_emb, num_or_size_splits=2, axis=-1)
-
             h = self.block1(x, gamma_beta=gamma_beta, training=training)
             h = self.block2(h, training=training)
-
             return h + self.res_conv(x)
+
+'''
+    Residual Layer: this layer takes in some function and apply the function on an input. In our case,
+    it will be used for incorporating pre-normalized attention and linear attention layers.
+'''
+class Residual(Layer):
+    def __init__(self, fn):
+        super(Residual, self).__init__()
+        self.fn = fn
+
+    def call(self, x, training=True):
+        with tf.device(device):
+            return self.fn(x, training=training) + x
+
+'''
+    Sinusoidal positional embedding layer: this layer generates a embeddings using sin and cos functions and
+    allows our model to learn the relative positions of input sequential data. In our specific case, we use 
+    this layer to transfer time steps to time ecodings in time embedding space
+'''
+class SinusoidalPosEmb(Layer):
+    def __init__(self, dim):
+        super(SinusoidalPosEmb, self).__init__()
+        self.dim = dim
+
+    def call(self, x, training=True):
+        with tf.device(device):
+            # cast float32 to x
+            x = tf.cast(x, tf.float32)
+            # create an embedding (encoding) according to dimension following the equation of sin and cos
+            emb = math.log(10000) / (self.dim // 2 - 1)
+            emb = tf.exp(tf.range(self.dim // 2, dtype=tf.float32) * -emb)
+            emb = x[:, None] * emb[None, :]
+            emb = tf.concat([tf.sin(emb), tf.cos(emb)], axis=-1)
+            return emb
 
 '''
     Linear Attention layer: this layer defines alinear attension layer. Unlike attension layer, 
@@ -204,7 +201,7 @@ class LinearAttention(Layer):
 
         self.to_out = Sequential([
             Conv2D(filters=dim, kernel_size=1, strides=1),
-            LayerNorm(dim)
+            Norm(dim)
         ])
 
     def call(self, x, training=True):
